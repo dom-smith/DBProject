@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from 'react-router-dom'; 
 import "./Signup-Login.css"; 
-import supabase from "../config/SupabaseClient";
+import supabase from "../utils/SupabaseClient";
 
+import UniversityDropdown from "../components/UniversityDropdown/UniveristyDropdown";
 const Signup = () => {
     const navigate = useNavigate();
 
@@ -49,6 +50,11 @@ const Signup = () => {
             return; 
         }        
 
+        // check if university is valid
+        if(role !== "super_admin") {
+            
+        }
+
         // Make request to supabase 
         const { data: userData, error: userError } = await supabase
             .from("users")
@@ -62,7 +68,8 @@ const Signup = () => {
         }
 
         console.log("User has been created:", userData);        // Used for debugging
-        navigate('/'); 
+        navigate('/');
+
     }
 
     return (
@@ -119,14 +126,17 @@ const Signup = () => {
                         </select>
                     </div>
                     <div className="input">
-                        <i className="material-icons">school</i>
+                        {/* <i className="material-icons">school</i>
                         <input 
                             type="text" 
                             placeholder="University"
                             value={university}
                             onChange={(e) => setUniversity(e.target.value)}
-                        />
+                        /> */}
+                       <UniversityDropdown></UniversityDropdown> 
+
                     </div>
+                    
                 </div>
                 <button type="submit" className="sign-up">Sign Up</button>
                 <a className="redirect-login" href="/login">Already Have an Account?</a>
