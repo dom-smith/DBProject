@@ -1,9 +1,9 @@
-import React from 'react';
-
+import React from 'react'; 
+ import Signup from './components/Signup/Signup';
 function App() {
   return (
     <div>
-      <h1>Hello World</h1>
+      <Signup></Signup>
     </div>
   );
 }
