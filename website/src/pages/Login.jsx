@@ -1,4 +1,4 @@
-import supabase from "../config/SupabaseClient";
+import supabase from "../utils/SupabaseClient";
 import { useEffect, useState } from "react";
 import "./Signup-Login.css"; 
 
