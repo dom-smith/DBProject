@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from 'react-router-dom'; 
 import "./Signup.css"; 
 
-const Signup = () => {
+const SignupForm = () => {
     return (
         <div className="container">
             <div className="header">
@@ -44,4 +44,4 @@ const Signup = () => {
     )
 }
 
-export default Signup; 
+export default SignupForm; 
