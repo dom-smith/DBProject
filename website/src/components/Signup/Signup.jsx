@@ -23,6 +23,10 @@ const Signup = () => {
                     <input type="password" placeholder="Password"/>
                 </div>
                 <div className="input">
+                    <i className="material-icons">key</i>
+                    <input type="password" placeholder="Confirm Password"/>
+                </div>
+                <div className="input">
                     <i className="material-icons">badge</i>
                     <input type="text" placeholder="User Type"/>
                 </div>
