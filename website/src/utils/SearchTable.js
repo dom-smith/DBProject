@@ -1,22 +1,35 @@
-import { data } from "react-router-dom";
+import { useEffect, useState } from "react";
 import supabase from "./SupabaseClient";
-import React, { useEffect, useState } from "react";
 
-// Given a table and return all names 
+const SearchTable = () => {
+    const [data, setData] = useState([]);
 
-const SearchTable = (tableName, columnName) => {
-    const fetchData = async () => {
-        const {data, error} = await supabase
-        .from(tableName)
-        .select(columnName); 
-        if (error) {
-            console.log(error); 
-        } else {
-            return data; 
-        }
-        return; 
-    }
-    fetchData();
-}
+    useEffect(() => {
+        const fetchData = async () => {
+            const { data, error } = await supabase
+                .from("universities")
+                .select("name"); 
+
+            if (error) {
+                console.log("Error in retrieving data", error);
+            } else {
+                console.log("Fetched data:", data);
+                setData(data); // Store data in state
+            }
+        };
+        fetchData();
+    }, []);
+
+    return (
+        <div>
+            <h2>Universities</h2>
+            <ul>
+                {data.map((uni, index) => (
+                    <li key={index}>{uni.name}</li>
+                ))}
+            </ul>
+        </div>
+    );
+};
 
 export default SearchTable;

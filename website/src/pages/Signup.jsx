@@ -1,12 +1,19 @@
 import { useState } from "react";
 import { useNavigate } from 'react-router-dom'; 
 import "./Signup-Login.css"; 
-import supabase from "../utils/SupabaseClient";
 
-import UniversityDropdown from "../components/UniversityDropdown/UniveristyDropdown";
+// utils 
+import supabase from "../utils/SupabaseClient";
+import SearchTable from "../utils/SearchTable";
+
+// react components
+import DropdownMenu from "../components/DropdownMenu/DropdownMenu";
+
+
+
 const Signup = () => {
     const navigate = useNavigate();
-
+    const search = SearchTable(); 
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     // const [method, setMethod] = useState(''); 
@@ -126,15 +133,7 @@ const Signup = () => {
                         </select>
                     </div>
                     <div className="input">
-                        {/* <i className="material-icons">school</i>
-                        <input 
-                            type="text" 
-                            placeholder="University"
-                            value={university}
-                            onChange={(e) => setUniversity(e.target.value)}
-                        /> */}
-                       <UniversityDropdown></UniversityDropdown> 
-
+                       <DropdownMenu inputName="University"></DropdownMenu>
                     </div>
                     
                 </div>
