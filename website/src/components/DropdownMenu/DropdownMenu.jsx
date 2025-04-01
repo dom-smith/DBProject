@@ -1,4 +1,4 @@
-import React, { useState } from "react"; 
+import React, { useState, useEffect, useRef } from "react"; 
 import "./DropdownMenu.css";
 
 // const university = [
@@ -20,6 +20,7 @@ import "./DropdownMenu.css";
 const DropdownMenu = ({ inputName, inputData }) => {
     const [input, setInput] = useState("")
     const [filteredInput, setFilteredInput] = useState([]); 
+    const dropdownRef = useRef(null); 
 
     const handleChange = (e) => {
         const value = e.target.value; 
@@ -27,16 +28,27 @@ const DropdownMenu = ({ inputName, inputData }) => {
 
         if (value === "") {
             setFilteredInput([]); 
-        } 
-        if (inputData){
+        } else  if (inputData){
             setFilteredInput(
                 inputData.filter((data) => 
                     data.toLowerCase().includes(value.toLowerCase()))
             ); 
-        } else {
-            return; 
-        }
+        } 
     }
+
+    // detect click outside of dropdown menu to hide the menu
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setFilteredInput([]);               // sets menu to empty to hide it
+            }
+        };
+
+        document.addEventListener("mousedown", handleClickOutside); 
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside); 
+        }
+    }, []);
 
     const selectInput = (data) => {
         setInput(data);
@@ -44,7 +56,7 @@ const DropdownMenu = ({ inputName, inputData }) => {
     }
 
     return (
-        <div className="dropdown-container">
+        <div className="dropdown-container" ref={dropdownRef}>
             <div className="input-container">
                 <i className="material-icons">school</i>
                 <input 
