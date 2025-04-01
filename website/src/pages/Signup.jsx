@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from 'react-router-dom'; 
 import "./Signup-Login.css"; 
 
 // utils 
 import supabase from "../utils/SupabaseClient";
-import SearchTable from "../utils/SearchTable";
 
 // react components
 import DropdownMenu from "../components/DropdownMenu/DropdownMenu";
@@ -13,7 +12,7 @@ import DropdownMenu from "../components/DropdownMenu/DropdownMenu";
 
 const Signup = () => {
     const navigate = useNavigate();
-    const search = SearchTable(); 
+    const [universities, setUniversities] = useState([]);
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     // const [method, setMethod] = useState(''); 
@@ -22,6 +21,21 @@ const Signup = () => {
     const [university, setUniversity] = useState(''); 
     const [role, setRole] = useState(''); 
     const [formError, setFormError] = useState(null); 
+
+    useEffect(() => {
+        const fetchUniversities = async () => {
+            const { data, error } = await supabase
+            .from("universities")
+            .select("name"); 
+
+            if (error) {
+                console.error("Error fetching universities from db:", error); 
+            } else {
+                setUniversities(data.map(uni=>uni.name)); 
+            }
+        }
+        fetchUniversities();
+    }, []);
 
     const handleSubmit = async (e) => {
         e.preventDefault(); 
@@ -133,9 +147,11 @@ const Signup = () => {
                         </select>
                     </div>
                     <div className="input">
-                       <DropdownMenu inputName="University"></DropdownMenu>
+                       <DropdownMenu 
+                            inputName="University" 
+                            inputData={universities}
+                        />
                     </div>
-                    
                 </div>
                 <button type="submit" className="sign-up">Sign Up</button>
                 <a className="redirect-login" href="/login">Already Have an Account?</a>
