@@ -68,7 +68,7 @@
     align-items: center;
     justify-content: center;
     width: 400px;
-    height: 70px;
+    height: 260px;
     margin: auto;
     height: 30px;
     border: 0px;
@@ -101,6 +101,7 @@
 
 .error {
     color: red; 
+    font-size: 30px;
     justify-content: center;
     display: flex;
     margin-top: 10px; 
