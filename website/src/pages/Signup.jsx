@@ -8,7 +8,7 @@ import supabase from "../utils/SupabaseClient";
 // react components
 import DropdownMenu from "../components/DropdownMenu/DropdownMenu";
 
-
+const roles = ["Super Admin", "Admin", "Student"]
 
 const Signup = () => {
     const navigate = useNavigate();
@@ -138,13 +138,17 @@ const Signup = () => {
                         />
                     </div>
                     <div className="input">
-                        <i className="material-icons">badge</i>
+                        {/* <i className="material-icons">badge</i>
                         <select className="roles" value={role} onChange={(e)=> setRole(e.target.value)}>
                             <option value="">Select a Role</option>
                             <option value="super_admin">Super Admin</option>
                             <option value="admin">Admin</option>
                             <option value="student">Student</option>
-                        </select>
+                        </select> */}
+                        <DropdownMenu 
+                            inputName="Role"
+                            inputData={roles}
+                        />
                     </div>
                     <div className="input">
                        <DropdownMenu 
