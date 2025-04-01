@@ -30,10 +30,6 @@ const Login = () => {
                 <input type="password" placeholder="Password"/>
             </div>
             <div className="input">
-                <i className="material-icons">badge</i>
-                <input type="text" placeholder="User Type"/>
-            </div>
-            <div className="input">
                 <i className="material-icons">school</i>
                 <input type="text" placeholder="University"/>
             </div>
