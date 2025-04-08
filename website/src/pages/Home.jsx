@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; 
+import supabase from '../utils/SupabaseClient';
 
 // mock data to demo
 const mockEvents = [
@@ -73,6 +75,9 @@ const currentUser = {
 };
 
 function Home() {
+  const navigate = useNavigate();
+  const [session, setSession] = useState(null); 
+  const [user, setUser] = useState(null); 
   const [events, setEvents] = useState([]);
   const [activeTab, setActiveTab] = useState('upcoming');
   const [filter, setFilter] = useState('all');
@@ -85,7 +90,48 @@ function Home() {
     setTimeout(() => {
       setEvents(mockEvents);
     }, 500);
-  }, []);
+
+    // Fetch user data 
+    const getUserSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession(); 
+      if (!session) {
+        navigate('/login');
+      } else {
+        setSession(session); 
+      }
+    };
+
+    // get user data from the actual user table
+    const getCurrentUser = async () => {
+      if (session) {
+        const { data: user, error } = await supabase
+          .from('users')
+          .select()
+          .eq('user_id', session.user.id); 
+        if (error) {
+          console.error("Could not retrieve user info", error); 
+        } else {
+          setUser(user);
+        }
+      } 
+    };
+    getUserSession();
+    getCurrentUser();
+
+    // redirects user on log out
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        navigate('/login'); 
+      } else if (event === 'SIGNED_IN') {
+        setSession(session); 
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [navigate]);
+
 
   // filter
   const filteredEvents = events.filter(event => {
