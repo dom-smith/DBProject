@@ -84,10 +84,8 @@ function Home() {
 
   // filter
   const filteredEvents = eventsArray.filter(event => {
-    if (!availableRSOs.length) return false;
-    const eventRSO = availableRSOs.find(rso => rso.rso_id === event.rso);
-    if (!eventRSO) return false;
-    if (!userRSOs.includes(eventRSO.name)) return false;
+    // Only display events that have visibility 'rso'
+
     
     if (activeTab === 'upcoming') {
       const eventDate = new Date(event.date);
@@ -98,7 +96,6 @@ function Home() {
       const now = new Date();
       if (eventDate >= now) return false;
     }
-
     if (filter !== 'all' && event.type !== filter) {
       return false;
     }

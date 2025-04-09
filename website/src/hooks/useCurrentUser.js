@@ -48,7 +48,6 @@ export default function useCurrentUser() {
             .from('rsos')
             .select('name')
             .in('rso_id', rsoIds);
-
           if (rsoError) throw rsoError;
           rsoNames = rsoData.map(r => r.name);
         }
@@ -70,6 +69,6 @@ export default function useCurrentUser() {
 
     getCurrentUser();
   }, [navigate]);
-
+  console.log(currentUser)
   return { currentUser, loading, error };
 }
