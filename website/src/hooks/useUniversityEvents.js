@@ -156,7 +156,7 @@ const useUniversityEvents = (universityName, currentUserId) => {
   useEffect(() => {
     fetchEvents();
   }, [fetchEvents]);
-
+  console.log(events)
   return { events, loading, error, refetch: fetchEvents };
 };
 

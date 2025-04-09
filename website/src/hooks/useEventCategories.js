@@ -24,7 +24,7 @@ const useEventCategories = () => {
 
     fetchCategories();
   }, []);
-
+  console.log(categories)
   return { categories, loadingCategories, errorCategories };
 };
 
