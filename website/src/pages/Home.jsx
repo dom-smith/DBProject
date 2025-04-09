@@ -2,103 +2,43 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom'; 
 import supabase from '../utils/SupabaseClient';
 import useCurrentUser from '../hooks/useCurrentUser';
-
-// mock data to demo
-const mockEvents = [
-  {
-    id: 1,
-    title: "Spring Campus Festival",
-    description: "Annual spring celebration with music, food, and activities",
-    date: "2025-04-15T14:00:00",
-    location: "Main Campus Quad",
-    type: "social",
-    visibility: "public",
-    university: "State University",
-    rso: null,
-    rating: 4.7,
-    comments: [
-      { id: 1, userId: 101, username: "alex_j", text: "Can't wait for this!", timestamp: "2025-04-01T10:23:00", isCurrentUser: true },
-      { id: 2, userId: 102, username: "maya22", text: "Is there a schedule of performances?", timestamp: "2025-04-02T09:15:00", isCurrentUser: false }
-    ]
-  },
-  {
-    id: 2,
-    title: "AI Research Symposium",
-    description: "Presentations on latest AI research from the Computer Science department",
-    date: "2025-04-20T09:00:00",
-    location: "Tech Building, Room 305",
-    type: "tech",
-    visibility: "private",
-    university: "State University",
-    rso: null,
-    rating: 4.2,
-    comments: [
-      { id: 3, userId: 103, username: "tech_enthusiast", text: "Will the presentations be recorded?", timestamp: "2025-04-03T14:10:00", isCurrentUser: false }
-    ]
-  },
-  {
-    id: 3,
-    title: "Robotics Club Demo Day",
-    description: "Showcasing this semester's robotics projects",
-    date: "2025-04-22T16:00:00",
-    location: "Engineering Hall",
-    type: "tech",
-    visibility: "rso",
-    university: "State University",
-    rso: "Robotics Club",
-    rating: 4.9,
-    comments: []
-  },
-  {
-    id: 4,
-    title: "Charity 5K Run",
-    description: "Annual fundraising run for local children's hospital",
-    date: "2025-04-25T08:00:00",
-    location: "University Park",
-    type: "fundraising",
-    visibility: "public",
-    university: "State University",
-    rso: "Community Service Alliance",
-    rating: 4.5,
-    comments: [
-      { id: 4, userId: 101, username: "alex_j", text: "I'll be volunteering at this event!", timestamp: "2025-04-05T11:20:00", isCurrentUser: true }
-    ]
-  }
-];
-
-// mock user data
-// const currentUser = {
-//   id: 101,
-//   name: "Alex Johnson",
-//   username: "alex_j",
-//   university: "State University",
-//   rsos: ["Robotics Club", "Chess Club"]
-// };
+import useUniversityEvents from '../hooks/useUniversityEvents';
+import useEventCategories from '../hooks/useEventCategories';
 
 function Home() {
   const navigate = useNavigate();
-  const { currentUser, loading, error } = useCurrentUser(); 
-  const [event, setEvent] = useState([]); 
-  const [events, setEvents] = useState([]);
+  const [session, setSession] = useState(null); 
   const [activeTab, setActiveTab] = useState('upcoming');
   const [filter, setFilter] = useState('all');
   const [commentInput, setCommentInput] = useState({});
   const [editingComment, setEditingComment] = useState(null);
   const [userRatings, setUserRatings] = useState({});
+  const { currentUser, loading: loadingUser, error: userError } = useCurrentUser();
+  const { events, loading: loadingEvents, error, refetch: refetchEvents } = useUniversityEvents(
+    currentUser ? currentUser.university : null,
+    currentUser ? currentUser.id : null
+  );
+  const { categories, loading: loadingCategories, error: categoriesError } = useEventCategories(); 
 
   useEffect(() => {
-    // fetch call api
-    const timer = setTimeout(() => {
-      setEvents(mockEvents);
-    }, 500);
-    return () => clearTimeout(timer); 
-  }, []);
+    // Redirects user on logout
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        navigate('/login'); 
+      } else if (event === 'SIGNED_IN') {
+        setSession(session); 
+      }
+    });
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [navigate]);
 
-  if (loading) return <div> Loading user data... </div>
-  if (error) return <div> Error: {error.message}</div>
-  if(!currentUser) return null; 
+  if (loadingUser) return <div>Loading...</div>
+  else if (userError) return <div>Error:</div>
+  else if (!currentUser) return <div>Could not retrieve user</div>
 
-  // filter
+  // Filter events based on current active tab and type.
   const filteredEvents = events.filter(event => {
     if (activeTab === 'upcoming') {
       const eventDate = new Date(event.date);
@@ -109,11 +49,9 @@ function Home() {
       const now = new Date();
       if (eventDate >= now) return false;
     }
-
     if (filter !== 'all' && event.type !== filter) {
       return false;
     }
-
     if (event.visibility === 'public') {
       return true;
     } else if (event.visibility === 'private' && event.university === currentUser.university) {
@@ -124,6 +62,15 @@ function Home() {
     return false;
   });
 
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (!error) {
+      navigate('/login'); 
+    } else {
+      console.error("Error logging out:", error);
+    }
+  };
+
   const handleCommentInputChange = (eventId, value) => {
     setCommentInput({
       ...commentInput,
@@ -131,45 +78,40 @@ function Home() {
     });
   };
 
-  const submitComment = (eventId) => {
-    if (!commentInput[eventId] || !commentInput[eventId].trim()) return;
+  const submitComment = async (eventId) => {
+    if (!commentInput[eventId] || !commentInput[eventId].trim()) {
+      return; 
+    }
+    // Create new comment object 
+    const newComment = {
+      event_id: eventId, 
+      user_id: currentUser.id, 
+      comment_text: commentInput[eventId]
+    };
+    // Insert new comment into db 
+    const { data: commentData, error: commentError } = await supabase
+      .from('comments')
+      .insert(newComment); 
 
-    const updatedEvents = events.map(event => {
-      if (event.id === eventId) {
-        const newComment = {
-          id: Date.now(), // gen temp id
-          userId: currentUser.id,
-          username: currentUser.username,
-          text: commentInput[eventId],
-          timestamp: new Date().toISOString(),
-          isCurrentUser: true
-        };
-        return {
-          ...event,
-          comments: [...event.comments, newComment]
-        };
-      }
-      return event;
-    });
-
-    setEvents(updatedEvents);
-    setCommentInput({
-      ...commentInput,
-      [eventId]: ''
-    });
+    if (commentError) {
+      console.error("Error submitting comment:", commentError);
+    } else {
+      refetchEvents(); // Update comments
+      setCommentInput({ ...commentInput, [eventId]: '' }); // Clear input after posting comment
+    }
   };
 
-  const deleteComment = (eventId, commentId) => {
-    const updatedEvents = events.map(event => {
-      if (event.id === eventId) {
-        return {
-          ...event,
-          comments: event.comments.filter(comment => comment.id !== commentId)
-        };
-      }
-      return event;
-    });
-    setEvents(updatedEvents);
+  const deleteComment = async (eventId, commentId) => {
+    const { error } = await supabase
+      .from('comments')
+      .delete()
+      .eq('comment_id', commentId); 
+
+    if (error) {
+      console.error("Error deleting the comment:", error); 
+    } else {
+      refetchEvents();
+    }
   };
 
   const startEditComment = (eventId, comment) => {
@@ -180,29 +122,19 @@ function Home() {
     });
   };
 
-  const saveEditedComment = () => {
+  const saveEditedComment = async () => {
     if (!editingComment) return;
+    const { error } = await supabase
+      .from('comments')
+      .update({ comment_text: editingComment.text })
+      .eq('comment_id', editingComment.commentId);
     
-    const updatedEvents = events.map(event => {
-      if (event.id === editingComment.eventId) {
-        return {
-          ...event,
-          comments: event.comments.map(comment => {
-            if (comment.id === editingComment.commentId) {
-              return {
-                ...comment,
-                text: editingComment.text
-              };
-            }
-            return comment;
-          })
-        };
-      }
-      return event;
-    });
-    
-    setEvents(updatedEvents);
-    setEditingComment(null);
+    if (error) {
+      console.error("Error updating comment:", error);
+    } else {
+      refetchEvents();
+      setEditingComment(null);
+    }
   };
 
   const handleRating = (eventId, rating) => {
@@ -228,7 +160,44 @@ function Home() {
     alert(`Sharing "${event.title}" to ${platform}`);
   };
 
-  // css junk
+  // NEW: Updated function to handle leaving an RSO.
+  // It first retrieves the rso's id by querying the `rsos` table using the rso name,
+  // then it deletes the corresponding entry from the `rso_members` table.
+  const handleLeaveRSO = async (rsoName) => {
+    const confirmLeave = window.confirm(`Are you sure you want to leave ${rsoName}?`);
+    if (!confirmLeave) return;
+
+    // Retrieve the rso id from the rsos table using its name.
+    const { data: rsoData, error: rsoError } = await supabase
+      .from('rsos')
+      .select('rso_id')
+      .eq('name', rsoName)
+      .single();
+
+    if (rsoError || !rsoData) {
+      console.error("Error retrieving RSO information:", rsoError);
+      alert("An error occurred while retrieving RSO information.");
+      return;
+    }
+
+    const { rso_id } = rsoData;
+
+    // Remove the user from the RSO by deleting the record in the rso_members table.
+    const { error: removeError } = await supabase
+      .from('rso_members')
+      .delete()
+      .eq('rso_id', rso_id)
+      .eq('user_id', currentUser.id);
+
+    if (removeError) {
+      console.error("Error leaving the RSO:", removeError);
+      alert("Failed to leave RSO. Please try again.");
+    } else {
+      alert(`You have successfully left ${rsoName}.`);
+      // Optionally, update any relevant state or re-fetch user data to reflect this change.
+    }
+  };
+
   const styles = {
     dashboard: {
       maxWidth: '1200px',
@@ -265,6 +234,15 @@ function Home() {
     },
     userName: {
       fontWeight: 'bold'
+    },
+    logout: {
+      backgroundColor: '#1da1f2',
+      color: 'white',
+      fontSize: '12px', 
+      borderRadius: '4px', 
+      cursor: 'pointer', 
+      border: '0px',
+      height: '20px'
     },
     tabs: {
       display: 'flex',
@@ -459,6 +437,17 @@ function Home() {
       textAlign: 'center',
       padding: '40px 0',
       color: '#666'
+    },
+    // NEW: Style for the Leave RSO button.
+    leaveButton: {
+      backgroundColor: '#f44336',
+      color: 'white',
+      fontSize: '12px',
+      borderRadius: '4px',
+      cursor: 'pointer',
+      border: 'none',
+      padding: '5px 10px',
+      marginTop: '10px'
     }
   };
 
@@ -471,6 +460,12 @@ function Home() {
           <div>
             <div style={styles.userName}>{currentUser.name}</div>
             <div>{currentUser.university}</div>
+            <button 
+              style={styles.logout}
+              onClick={handleLogout}
+            >
+              Logout
+            </button>
           </div>
         </div>
       </header>
@@ -494,6 +489,15 @@ function Home() {
         >
           Past Events
         </div>
+        <div 
+          style={{ 
+            ...styles.tab, 
+            ...(activeTab === 'myrsos' ? styles.activeTab : {}) 
+          }}
+          onClick={() => setActiveTab('myrsos')}
+        >
+          My RSOs
+        </div>
       </div>
 
       <div style={styles.filtersSection}>
@@ -504,152 +508,180 @@ function Home() {
           onChange={(e) => setFilter(e.target.value)}
         >
           <option value="all">All Types</option>
-          <option value="social">Social</option>
-          <option value="tech">Tech</option>
-          <option value="fundraising">Fundraising</option>
+          {!loadingCategories && !categoriesError && categories.map(cat => (
+            <option key={cat.category_id} value={cat.category_name}>
+              {cat.category_name}
+            </option>
+          ))}
         </select>
       </div>
 
       <div style={styles.eventsList}>
-        {filteredEvents.length === 0 ? (
-          <div style={styles.emptyState}>
-            <h3>No events found</h3>
-            <p>There are no events matching your current filters.</p>
-          </div>
-        ) : (
-          filteredEvents.map(event => (
-            <div key={event.id} style={styles.eventCard}>
-              <div style={styles.eventHeader}>
-                <div style={styles.eventTitle}>{event.title}</div>
-                <div style={styles.eventDate}>{formatEventDate(event.date)}</div>
+        {activeTab === 'myrsos' ? (
+          currentUser.rsos && currentUser.rsos.length > 0 ? (
+            currentUser.rsos.map((club, index) => (
+              <div key={index} style={styles.eventCard}>
+                <div style={styles.eventHeader}>
+                  <div style={styles.eventTitle}>{club}</div>
+                </div>
+                {/* Leave RSO Button */}
+                <div style={{ padding: '15px' }}>
+                  <button 
+                    style={styles.leaveButton} 
+                    onClick={() => handleLeaveRSO(club)}
+                  >
+                    Leave RSO
+                  </button>
+                </div>
               </div>
-              <div style={styles.eventBody}>
-                <div style={styles.eventLocation}>
-                  📍 {event.location}
+            ))
+          ) : (
+            <div style={styles.emptyState}>
+              <h3>No RSOs found</h3>
+              <p>You're not part of any RSOs yet.</p>
+            </div>
+          )
+        ) : (
+          filteredEvents.length === 0 ? (
+            <div style={styles.emptyState}>
+              <h3>No events found</h3>
+              <p>There are no events matching your current filters.</p>
+            </div>
+          ) : (
+            filteredEvents.map(event => (
+              <div key={event.id} style={styles.eventCard}>
+                <div style={styles.eventHeader}>
+                  <div style={styles.eventTitle}>{event.title}</div>
+                  <div style={styles.eventDate}>{formatEventDate(event.date)}</div>
                 </div>
-                <div>
-                  {event.visibility === 'public' && (
-                    <span style={{...styles.badge, ...styles.publicBadge}}>Public</span>
-                  )}
-                  {event.visibility === 'private' && (
-                    <span style={{...styles.badge, ...styles.privateBadge}}>Private</span>
-                  )}
-                  {event.visibility === 'rso' && (
-                    <span style={{...styles.badge, ...styles.rsoBadge}}>{event.rso}</span>
-                  )}
-                  <span style={{...styles.badge, backgroundColor: '#f3e5f5', color: '#7b1fa2'}}>{event.type}</span>
-                </div>
-                <div style={styles.eventDescription}>{event.description}</div>
-                
-                <div style={styles.ratingContainer}>
-                  <div style={styles.ratingStars}>
-                    {[1, 2, 3, 4, 5].map(star => (
-                      <span 
-                        key={star} 
-                        style={styles.star}
-                        onClick={() => handleRating(event.id, star)}
-                      >
-                        {(userRatings[event.id] || 0) >= star ? '★' : '☆'}
-                      </span>
-                    ))}
+                <div style={styles.eventBody}>
+                  <div style={styles.eventLocation}>📍 {event.location}</div>
+                  <div>
+                    {event.visibility === 'public' && (
+                      <span style={{...styles.badge, ...styles.publicBadge}}>Public</span>
+                    )}
+                    {event.visibility === 'private' && (
+                      <span style={{...styles.badge, ...styles.privateBadge}}>Private</span>
+                    )}
+                    {event.visibility === 'rso' && (
+                      <span style={{...styles.badge, ...styles.rsoBadge}}>{event.rso}</span>
+                    )}
+                    <span style={{...styles.badge, backgroundColor: '#f3e5f5', color: '#7b1fa2'}}>
+                      {event.type}
+                    </span>
                   </div>
-                  <div style={styles.ratingText}>
-                    {event.rating} ({userRatings[event.id] ? `Your rating: ${userRatings[event.id]}` : 'Not rated'})
+                  <div style={styles.eventDescription}>{event.description}</div>
+                  
+                  <div style={styles.ratingContainer}>
+                    <div style={styles.ratingStars}>
+                      {[1, 2, 3, 4, 5].map(star => (
+                        <span 
+                          key={star} 
+                          style={styles.star}
+                          onClick={() => handleRating(event.id, star)}
+                        >
+                          {(userRatings[event.id] || 0) >= star ? '★' : '☆'}
+                        </span>
+                      ))}
+                    </div>
+                    <div style={styles.ratingText}>
+                      {event.rating} ({userRatings[event.id] ? `Your rating: ${userRatings[event.id]}` : 'Not rated'})
+                    </div>
                   </div>
-                </div>
-                
-                <div style={styles.commentsSection}>
-                  <h4>Comments ({event.comments.length})</h4>
-                  <div style={styles.commentsList}>
-                    {event.comments.map(comment => (
-                      <div key={comment.id} style={styles.comment}>
-                        <div style={styles.commentHeader}>
-                          <div>
-                            <span style={styles.commentAuthor}>{comment.username}</span>
-                            <span style={styles.commentTimestamp}>
-                              {new Date(comment.timestamp).toLocaleString()}
-                            </span>
-                          </div>
-                          {comment.isCurrentUser && (
-                            <div style={styles.commentActions}>
-                              <span 
-                                style={styles.actionButton}
-                                onClick={() => startEditComment(event.id, comment)}
-                              >
-                                Edit
-                              </span>
-                              <span 
-                                style={styles.actionButton}
-                                onClick={() => deleteComment(event.id, comment.id)}
-                              >
-                                Delete
+                  
+                  <div style={styles.commentsSection}>
+                    <h4>Comments ({event.comments.length})</h4>
+                    <div style={styles.commentsList}>
+                      {event.comments.map(comment => (
+                        <div key={comment.id} style={styles.comment}>
+                          <div style={styles.commentHeader}>
+                            <div>
+                              <span style={styles.commentAuthor}>{comment.username}</span>
+                              <span style={styles.commentTimestamp}>
+                                {new Date(comment.timestamp).toLocaleString()}
                               </span>
                             </div>
+                            {comment.isCurrentUser && (
+                              <div style={styles.commentActions}>
+                                <span 
+                                  style={styles.actionButton}
+                                  onClick={() => startEditComment(event.id, comment)}
+                                >
+                                  Edit
+                                </span>
+                                <span 
+                                  style={styles.actionButton}
+                                  onClick={() => deleteComment(event.id, comment.id)}
+                                >
+                                  Delete
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          {editingComment && editingComment.commentId === comment.id ? (
+                            <div>
+                              <textarea 
+                                value={editingComment.text}
+                                onChange={(e) => setEditingComment({ ...editingComment, text: e.target.value })}
+                                style={styles.commentInput}
+                                rows="2"
+                              />
+                              <div style={{ marginTop: '5px' }}>
+                                <button 
+                                  onClick={saveEditedComment}
+                                  style={{ ...styles.commentButton, marginRight: '5px' }}
+                                >
+                                  Save
+                                </button>
+                                <button 
+                                  onClick={() => setEditingComment(null)}
+                                  style={{ ...styles.commentButton, backgroundColor: '#f44336' }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={styles.commentText}>{comment.text}</div>
                           )}
                         </div>
-                        {editingComment && editingComment.commentId === comment.id ? (
-                          <div>
-                            <textarea 
-                              value={editingComment.text}
-                              onChange={(e) => setEditingComment({...editingComment, text: e.target.value})}
-                              style={styles.commentInput}
-                              rows="2"
-                            />
-                            <div style={{marginTop: '5px'}}>
-                              <button 
-                                onClick={saveEditedComment}
-                                style={{...styles.commentButton, marginRight: '5px'}}
-                              >
-                                Save
-                              </button>
-                              <button 
-                                onClick={() => setEditingComment(null)}
-                                style={{...styles.commentButton, backgroundColor: '#f44336'}}
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div style={styles.commentText}>{comment.text}</div>
-                        )}
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                    <div style={styles.commentInputContainer}>
+                      <textarea 
+                        placeholder="Add a comment..."
+                        style={styles.commentInput}
+                        value={commentInput[event.id] || ''}
+                        onChange={(e) => handleCommentInputChange(event.id, e.target.value)}
+                        rows="2"
+                      />
+                      <button 
+                        style={styles.commentButton}
+                        onClick={() => submitComment(event.id)}
+                      >
+                        Post
+                      </button>
+                    </div>
                   </div>
-                  <div style={styles.commentInputContainer}>
-                    <textarea 
-                      placeholder="Add a comment..."
-                      style={styles.commentInput}
-                      value={commentInput[event.id] || ''}
-                      onChange={(e) => handleCommentInputChange(event.id, e.target.value)}
-                      rows="2"
-                    />
+                  
+                  <div style={styles.socialShare}>
                     <button 
-                      style={styles.commentButton}
-                      onClick={() => submitComment(event.id)}
+                      style={{ ...styles.socialButton, ...styles.facebookButton }}
+                      onClick={() => shareToSocial('Facebook', event.id)}
                     >
-                      Post
+                      Share to Facebook
+                    </button>
+                    <button 
+                      style={{ ...styles.socialButton, ...styles.twitterButton }}
+                      onClick={() => shareToSocial('Twitter', event.id)}
+                    >
+                      Share to Twitter
                     </button>
                   </div>
                 </div>
-                
-                <div style={styles.socialShare}>
-                  <button 
-                    style={{...styles.socialButton, ...styles.facebookButton}}
-                    onClick={() => shareToSocial('Facebook', event.id)}
-                  >
-                    Share to Facebook
-                  </button>
-                  <button 
-                    style={{...styles.socialButton, ...styles.twitterButton}}
-                    onClick={() => shareToSocial('Twitter', event.id)}
-                  >
-                    Share to Twitter
-                  </button>
-                </div>
               </div>
-            </div>
-          ))
+            ))
+          )
         )}
       </div>
     </div>
