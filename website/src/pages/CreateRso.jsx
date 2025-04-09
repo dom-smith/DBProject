@@ -1,49 +1,25 @@
-import { useEffect, useState } from "react";
+// CreateRso.js
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../utils/SupabaseClient";
+import NavBar from "../components/Navbar"; 
+import useCurrentUser from "../hooks/useCurrentUser";
 import "./Signup-Login.css";
 
 const CreateRso = () => {
   const navigate = useNavigate();
-  const [authorized, setAuthorized] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [rsoName, setRsoName] = useState('');
   const [formError, setFormError] = useState(null);
-  const [rsoName, setRsoName] = useState("");
+  const { currentUser, loading } = useCurrentUser();
 
+  // Redirect if user is not super_admin
   useEffect(() => {
-    const checkRole = async () => {
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
-
-      if (sessionError || !session || !session.user) {
-        navigate("/"); // Not logged in
-        return;
+    if (!loading && currentUser) {
+      if (currentUser.role !== 'super_admin') {
+        navigate("/");
       }
-
-      const { data: userData, error: userError } = await supabase
-        .from("users")
-        .select("role")
-        .eq("user_id", session.user.id)
-        .single();
-
-      if (userError || !userData) {
-        navigate("/"); // User not found
-        return;
-      }
-
-      if (userData.role === "admin" || userData.role === "super_admin") {
-        setAuthorized(true);
-      } else {
-        navigate("/"); // Not authorized
-      }
-
-      setLoading(false);
-    };
-
-    checkRole();
-  }, [navigate]);
+    }
+  }, [loading, currentUser, navigate]);
 
   const handleCreateRso = async (e) => {
     e.preventDefault();
@@ -54,44 +30,74 @@ const CreateRso = () => {
       return;
     }
 
-    const { error } = await supabase.from("rsos").insert([{ name: rsoName, is_active: true }]);
+    // Get the current session.
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session) {
+      setFormError("User session error. Please log in.");
+      return;
+    }
+    const userId = session.user.id;
 
+    // Fetch the user's university id.
+    const { data: userData, error: userError } = await supabase
+      .from("users")
+      .select("university_id")
+      .eq("user_id", userId)
+      .single();
+    if (userError) {
+      setFormError("Error fetching user details.");
+      return;
+    }
+
+    // Insert new RSO
+    const { data, error } = await supabase
+      .from("rsos")
+      .insert([{ 
+        name: rsoName, 
+        university_id: userData.university_id, 
+        admin_id: userId, 
+        is_active: false 
+      }]);
     if (error) {
       console.error("Error creating RSO:", error);
-      setFormError("Failed to create RSO. Try again.");
-    } else {
-      alert("RSO created successfully!");
-      setRsoName("");
+      setFormError(error.message);
+      return;
     }
+    console.log("RSO created successfully", data);
+    navigate("/");
   };
 
-  if (loading) return <div className="container">Checking authorization...</div>;
+  if (loading) return <div className="container">Loading...</div>;
 
-  return authorized ? (
-    <div className="container">
-      <form onSubmit={handleCreateRso}>
-        <div className="header">
-          <div className="text">Create RSO</div>
-          <div className="underline"></div>
-        </div>
-
-        <div className="inputs">
-          <div className="input">
-            <i className="material-icons">groups</i>
-            <input
-              type="text"
-              placeholder="RSO Name"
-              value={rsoName}
-              onChange={(e) => setRsoName(e.target.value)}
-            />
+  return (
+    <>
+      <NavBar currentUser={currentUser} />
+      <div className="container">
+        <form onSubmit={handleCreateRso}>
+          <div className="header">
+            <div className="text">Create RSO</div>
+            <div className="underline"></div>
           </div>
-          <button type="submit" className="sign-up">Create RSO</button>
-        </div>
-
-        {formError && <div className="error">{formError}</div>}
-      </form>
-    </div>
-  ) : null;
+          <div className="inputs">
+            <div className="input">
+              <i className="material-icons">groups</i>
+              <input 
+                type="text" 
+                placeholder="RSO Name" 
+                value={rsoName}
+                onChange={(e) => setRsoName(e.target.value)}
+              />
+            </div>
+            <button type="submit" className="sign-up">Create RSO</button>
+            <div className="forgot-login-container">
+              <a href="/">Back to Home</a>
+            </div>
+          </div>
+          {formError && <div className="error">{formError}</div>}
+        </form>
+      </div>
+    </>
+  );
 };
 
 export default CreateRso;
