@@ -22,6 +22,7 @@ export default function useCurrentUser() {
           .select('*')
           .eq('user_id', session.user.id)
           .single();
+          console.log(userData);
 
         if (userError) throw userError;
 
@@ -51,13 +52,14 @@ export default function useCurrentUser() {
           if (rsoError) throw rsoError;
           rsoNames = rsoData.map(r => r.name);
         }
-
+        console.log(userData)
         setCurrentUser({
           id: userData.user_id,
           name: userData.name,
           username: userData.email,
           university: uniData.name,
-          rsos: rsoNames
+          rsos: rsoNames,
+          role: userData.role
         });
       } catch (err) {
         console.error("Error fetching current user:", err);

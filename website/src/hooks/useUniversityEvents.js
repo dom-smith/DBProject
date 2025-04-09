@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import supabase from '../utils/SupabaseClient';
 
-const useUniversityEvents = (universityName, currentUserId, userRSOs = []) => {
+const useUniversityEvents = (universityName, currentUserId) => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -102,16 +102,9 @@ const useUniversityEvents = (universityName, currentUserId, userRSOs = []) => {
         rsoMap[rso.rso_id] = rso.name;
       });
 
-      // Filter events.
-      // For events with visibility 'rso', include the event if the user is in that RSO.
-      // For non-rso events, include the event if the creator's university_id matches the looked-up university id.
+      // Filter events so that only events whose creator belongs to the looked-up university are included.
       const filteredEvents = eventsData.filter(e => {
-        if (e.visibility === 'rso') {
-          // Return true only if the event's RSO (using rsoMap) is in the user's RSOs.
-          return e.rso_id && userRSOs.includes(rsoMap[e.rso_id]);
-        } else {
-          return e.creator && e.creator.university_id === universityId;
-        }
+        return e.creator && e.creator.university_id === universityId;
       });
 
       // Format each event.
@@ -140,7 +133,7 @@ const useUniversityEvents = (universityName, currentUserId, userRSOs = []) => {
           id: e.event_id,
           title: e.name,
           description: e.description,
-          date: e.date,
+          date: e.date, // If needed, combine with time here.
           location: locationMap[e.location_id] || '',
           type: categoryMap[e.category_id] || '',
           visibility: e.visibility,
@@ -158,13 +151,12 @@ const useUniversityEvents = (universityName, currentUserId, userRSOs = []) => {
     } finally {
       setLoading(false);
     }
-  }, [universityId, currentUserId, userRSOs, universityName]);
+  }, [universityId, currentUserId]);
 
   useEffect(() => {
     fetchEvents();
   }, [fetchEvents]);
 
-  console.log(events);
   return { events, loading, error, refetch: fetchEvents };
 };
 

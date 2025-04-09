@@ -90,7 +90,13 @@ const Signup = () => {
         }
     
         console.log("User has been created:", userData);
-        navigate('/');
+        
+        // Redirect based on role.
+        if (role === 'admin' || role === 'super_admin') {
+            navigate('/create-rso');
+        } else {
+            navigate('/');
+        }
     };
     
     return (
