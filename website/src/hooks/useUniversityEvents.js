@@ -7,7 +7,6 @@ const useUniversityEvents = (universityName, currentUserId) => {
   const [error, setError] = useState(null);
   const [universityId, setUniversityId] = useState(null);
 
-  // Step1: Lookup the university id by its name
   useEffect(() => {
     if (!universityName) {
       setUniversityId(null);
@@ -30,17 +29,30 @@ const useUniversityEvents = (universityName, currentUserId) => {
     fetchUniversityId();
   }, [universityName]);
 
-  // Step2: Use the universityId (once available) to fetch and format events from supabase
   const fetchEvents = useCallback(async () => {
-    if (!universityId) {
+    if (!currentUserId) {
       setEvents([]);
       setLoading(false);
-      console.log("No university id available yet.");
+      console.log("No current user id available.");
       return;
     }
     try {
-      // Fetch approved events along with related data,
-      // including joining comments to their users to retrieve the email.
+      const { data: rsoMemberData, error: rsoMemberError } = await supabase
+        .from('rso_members')
+        .select('*')
+        .eq('user_id', currentUserId);
+      if (rsoMemberError) throw rsoMemberError;
+      console.log("User ID:", currentUserId);
+      console.log("RSO Member Data:", rsoMemberData);
+      
+      const userRsoIds = rsoMemberData.map(m => m.rso_id);
+      if (userRsoIds.length === 0) {
+        console.log("User is not a member of any RSOs.");
+        setEvents([]);
+        setLoading(false);
+        return;
+      }
+
       const { data: eventsData, error: eventsError } = await supabase
         .from('events')
         .select(`
@@ -48,7 +60,6 @@ const useUniversityEvents = (universityName, currentUserId) => {
           name, 
           description, 
           date, 
-          visibility, 
           created_by, 
           rso_id,
           category_id, 
@@ -63,10 +74,11 @@ const useUniversityEvents = (universityName, currentUserId) => {
           ), 
           creator:users!events_created_by_fkey ( university_id )
         `)
-        .eq('is_approved', true);
-      if (eventsError) throw eventsError;
+        .in('rso_id', userRsoIds)
 
-      // Fetch locations.
+        if (eventsError) throw eventsError;
+      console.log("Events Data:", eventsData);
+
       const locationIds = Array.from(new Set(eventsData.map(e => e.location_id)));
       const { data: locationData, error: locationError } = await supabase
         .from('locations')
@@ -90,7 +102,7 @@ const useUniversityEvents = (universityName, currentUserId) => {
         categoryMap[cat.category_id] = cat.category_name;
       });
 
-      // Fetch RSOs, if applicable.
+      // Fetch RSOs data if needed for display.
       const rsoIds = Array.from(new Set(eventsData.map(e => e.rso_id).filter(id => id != null)));
       const { data: rsoData, error: rsoError } = await supabase
         .from('rsos')
@@ -102,14 +114,13 @@ const useUniversityEvents = (universityName, currentUserId) => {
         rsoMap[rso.rso_id] = rso.name;
       });
 
-      // Filter events so that only events whose creator belongs to the looked-up university are included.
+      // (Optional) If you still want to filter events based on the creator's university:
       const filteredEvents = eventsData.filter(e => {
         return e.creator && e.creator.university_id === universityId;
       });
 
-      // Format each event.
       const formattedEvents = filteredEvents.map(e => {
-        // Compute average rating from comments.
+        // Calculate average rating.
         let avgRating = 0;
         if (e.comments && e.comments.length > 0) {
           const ratings = e.comments.map(c => c.rating).filter(r => r != null);
@@ -117,12 +128,11 @@ const useUniversityEvents = (universityName, currentUserId) => {
             avgRating = ratings.reduce((acc, cur) => acc + cur, 0) / ratings.length;
           }
         }
-        // Format the comments array.
+        // Format comments.
         const formattedComments = e.comments
           ? e.comments.map(c => ({
               id: c.comment_id,
               userId: c.user_id,
-              // Derive the username from the email before the '@'.
               username: c.user && c.user.email ? c.user.email.split('@')[0] : '',
               text: c.comment_text,
               timestamp: c.created_at,
@@ -133,7 +143,8 @@ const useUniversityEvents = (universityName, currentUserId) => {
           id: e.event_id,
           title: e.name,
           description: e.description,
-          date: e.date, // If needed, combine with time here.
+          date: e.date,
+          time: e.time,
           location: locationMap[e.location_id] || '',
           type: categoryMap[e.category_id] || '',
           visibility: e.visibility,

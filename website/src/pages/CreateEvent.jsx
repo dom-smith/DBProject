@@ -2,22 +2,67 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import supabase from "../utils/SupabaseClient";
 import useCurrentUser from "../hooks/useCurrentUser";
-import NavBar from "./NavBar"; // Adjust the import path as needed
+import NavBar from "../components/Navbar";
 import "./Signup-Login.css";
 
 const CreateEvent = () => {
   const navigate = useNavigate();
   const { currentUser, loading } = useCurrentUser();
   const [formError, setFormError] = useState(null);
-
-  // Form state
   const [eventName, setEventName] = useState("");
   const [description, setDescription] = useState("");
   const [eventDate, setEventDate] = useState("");
   const [eventTime, setEventTime] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [contactEmail, setContactEmail] = useState("");
+  // For dropdowns:
   const [rsoName, setRsoName] = useState("");
+  const [eventCategory, setEventCategory] = useState("");
+  const [selectedLocation, setSelectedLocation] = useState("");
+
+  // State for dropdown options
+  const [categories, setCategories] = useState([]);
+  const [rsos, setRsos] = useState([]);
+  const [locations, setLocations] = useState([]);
+
+  // Fetch event categories from the database
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const { data, error } = await supabase.from("event_categories").select("*");
+      if (error) {
+        console.error("Error fetching event categories:", error);
+      } else {
+        setCategories(data);
+      }
+    };
+    fetchCategories();
+  }, []);
+
+  // Fetch RSOs from the database (optionally you can filter by the admin's university)
+  useEffect(() => {
+    const fetchRSOs = async () => {
+      const { data, error } = await supabase.from("rsos").select("*");
+      if (error) {
+        console.error("Error fetching RSOs:", error);
+      } else {
+        setRsos(data);
+      }
+    };
+    fetchRSOs();
+  }, [currentUser]);
+
+  // Fetch locations for dropdown
+  useEffect(() => {
+    const fetchLocations = async () => {
+      const { data, error } = await supabase.from("locations").select("*");
+      if (error) {
+        console.error("Error fetching locations:", error);
+      } else {
+        setLocations(data);
+      }
+    };
+    fetchLocations();
+  }, []);
 
   // Redirect non-admin users
   useEffect(() => {
@@ -32,7 +77,6 @@ const CreateEvent = () => {
     e.preventDefault();
     setFormError(null);
 
-    // Validate that required fields are filled
     if (
       !eventName.trim() ||
       !description.trim() ||
@@ -40,13 +84,22 @@ const CreateEvent = () => {
       !eventTime ||
       !contactPhone.trim() ||
       !contactEmail.trim() ||
-      !rsoName.trim()
+      !rsoName.trim() ||
+      !eventCategory.trim() ||
+      !selectedLocation.trim()
     ) {
       setFormError("Please fill in all fields.");
       return;
     }
 
-    // Get the current session to obtain the user id.
+    // Combine the date and time into a single datetime value
+    const eventDateTime = new Date(`${eventDate}T${eventTime}`);
+    if (isNaN(eventDateTime)) {
+      setFormError("Invalid date or time.");
+      return;
+    }
+
+    // Get the current session to retrieve the user ID.
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !session) {
       setFormError("User session error. Please log in.");
@@ -54,34 +107,34 @@ const CreateEvent = () => {
     }
     const userId = session.user.id;
 
-    // Look up the RSO id from the rsos table given the rsoName.
+    // Fetch the rso_id for the selected RSO name.
     const { data: rsoData, error: rsoError } = await supabase
       .from("rsos")
       .select("rso_id")
       .eq("name", rsoName)
       .single();
-
     if (rsoError || !rsoData) {
       console.error("Error fetching RSO:", rsoError);
       setFormError("RSO not found. Please check the RSO name.");
       return;
     }
-    
-    // Insert the event.
+
+    // Insert a new event including combined datetime, selected category, and location.
     const { data, error } = await supabase
       .from("events")
       .insert([
         {
           name: eventName,
           description,
-          date: eventDate,
-          time: eventTime,
+          event_datetime: eventDateTime, // Combined date and time
           contact_phone: contactPhone,
           contact_email: contactEmail,
           created_by: userId,
           rso_id: rsoData.rso_id,
+          category_id: eventCategory, // Selected event category ID
+          location_id: selectedLocation, // Selected location ID
           visibility: 'rso',
-          is_approved: false // New events default to not approved
+          is_approved: true 
         }
       ]);
     if (error) {
@@ -90,7 +143,7 @@ const CreateEvent = () => {
       return;
     }
     console.log("Event created successfully:", data);
-    alert("Event created successfully! It will be visible once approved.");
+    alert("Event created successfully!");
     navigate("/");
   };
 
@@ -161,20 +214,58 @@ const CreateEvent = () => {
                 onChange={(e) => setContactEmail(e.target.value)}
               />
             </div>
+            {/* Dropdown for selecting event category */}
+            <div className="input">
+              <i className="material-icons">category</i>
+              <select 
+                className="roles"
+                value={eventCategory} 
+                onChange={(e) => setEventCategory(e.target.value)}
+              >
+                <option className="dropdown-option" value="">Select Category</option>
+                {categories.map(cat => (
+                  <option key={cat.category_id} className="dropdown-option" value={cat.category_id}>
+                    {cat.category_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {/* Dropdown for selecting the RSO */}
             <div className="input">
               <i className="material-icons">group</i>
-              <input 
-                type="text" 
-                placeholder="RSO Name" 
-                value={rsoName}
+              <select 
+                className="roles"
+                value={rsoName} 
                 onChange={(e) => setRsoName(e.target.value)}
-              />
+              >
+                <option className="dropdown-option" value="">Select RSO</option>
+                {rsos.map(rso => (
+                  <option key={rso.rso_id} className="dropdown-option" value={rso.name}>
+                    {rso.name}
+                  </option>
+                ))}
+              </select>
             </div>
-          </div>
-
-          <button type="submit" className="sign-up">Create Event</button>
-          <div className="forgot-login-container">
-            <a href="/">Back to Home</a>
+            {/* Dropdown for selecting a Location */}
+            <div className="input">
+              <i className="material-icons">location_on</i>
+              <select 
+                className="roles"
+                value={selectedLocation} 
+                onChange={(e) => setSelectedLocation(e.target.value)}
+              >
+                <option className="dropdown-option" value="">Select Location</option>
+                {locations.map(loc => (
+                  <option key={loc.location_id} className="dropdown-option" value={loc.location_id}>
+                    {loc.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button type="submit" className="sign-up">Create Event</button>
+            <div className="forgot-login-container">
+              <a href="/">Back to Dashboard</a>
+            </div>
           </div>
           {formError && <div className="error">{formError}</div>}
         </form>

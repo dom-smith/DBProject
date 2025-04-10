@@ -56,7 +56,7 @@ const CreateRso = () => {
         name: rsoName, 
         university_id: userData.university_id, 
         admin_id: userId, 
-        is_active: false 
+        is_active: true 
       }]);
     if (error) {
       console.error("Error creating RSO:", error);
@@ -64,7 +64,6 @@ const CreateRso = () => {
       return;
     }
     console.log("RSO created successfully", data);
-    navigate("/");
   };
 
   if (loading) return <div className="container">Loading...</div>;

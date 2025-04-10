@@ -6,6 +6,7 @@ import Signup from './pages/Signup';
 import Login from './pages/Login'
 import Home from './pages/Home';
 import CreateRso from './pages/CreateRso';
+import CreateEvent from './pages/CreateEvent';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<Home />} />
         <Route path="/create-rso" element={<CreateRso />} />
+        <Route path="/create-event" element={<CreateEvent/>} />
       </Routes>
     </BrowserRouter>
   );
