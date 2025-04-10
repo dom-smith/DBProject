@@ -92,8 +92,10 @@ const Signup = () => {
         console.log("User has been created:", userData);
         
         // Redirect based on role.
-        if (role === 'admin' || role === 'super_admin') {
+        if (role === 'super_admin')  {
             navigate('/create-rso');
+        } else if (role === 'admin') {
+            navigate('/create-event');
         } else {
             navigate('/');
         }

@@ -15,7 +15,7 @@ function Home() {
   const [userRatings, setUserRatings] = useState({});
 
   const { currentUser, loading: loadingUser, error: userError } = useCurrentUser();
-  // Assume currentUser.rsos is an array of names representing the RSOs the user belongs to.
+  // Assume currentUser.rsos is an array of strings (RSO names) representing the RSOs the user is a member of.
   const [userRSOs, setUserRSOs] = useState(currentUser ? currentUser.rsos : []);
   const [availableRSOs, setAvailableRSOs] = useState([]);
   const { events, loading: loadingEvents, error, refetch: refetchEvents } = useUniversityEvents(
@@ -32,7 +32,7 @@ function Home() {
 
   useEffect(() => {
     if (currentUser) {
-      // Fetch available RSOs from the user's university that are active
+      // Fetch available RSOs from the user's university that are active.
       const fetchAvailableRSOs = async () => {
         try {
           const { data: uniData, error: uniError } = await supabase
@@ -54,7 +54,7 @@ function Home() {
             setAvailableRSOs(rsoData);
           }
         } catch (err) {
-          console.error("Error fetching rsos:", err);
+          console.error("Error fetching RSOs:", err);
         }
       };
       fetchAvailableRSOs();
@@ -62,7 +62,7 @@ function Home() {
   }, [currentUser]);
 
   useEffect(() => {
-    // redirects user on log out
+    // Redirect on log out.
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         navigate('/login'); 
@@ -76,35 +76,47 @@ function Home() {
   }, [navigate]);
 
   if (loadingUser) return <div>Loading...</div>;
-  else if (userError) return <div>Error:  </div>;
-  else if (!currentUser) return <div>Could not retrieve user</div>;
+  if (userError) return <div>Error loading user.</div>;
+  if (!currentUser) return <div>Could not retrieve user</div>;
 
-  // Ensure that events is an array (wrap in array if it's a single object)
+  // Ensure that events is an array.
   const eventsArray = Array.isArray(events) ? events : [events];
 
-  // filter
+  // Filter events based on activeTab and filter (e.g., by date).
   const filteredEvents = eventsArray.filter(event => {
-    // Only display events that have visibility 'rso'
-
-    
-    if (activeTab === 'upcoming') {
-      const eventDate = new Date(event.date);
-      const now = new Date();
-      if (eventDate < now) return false;
-    } else if (activeTab === 'past') {
-      const eventDate = new Date(event.date);
-      const now = new Date();
-      if (eventDate >= now) return false;
-    }
-    if (filter !== 'all' && event.type !== filter) {
-      return false;
-    }
-
-    // TODO: change event visibility 
+    const eventDate = new Date(event.date);
+    const now = new Date();
+    if (activeTab === 'upcoming' && eventDate < now) return false;
+    if (activeTab === 'past' && eventDate >= now) return false;
+    if (filter !== 'all' && event.type !== filter) return false;
     return true;
   });
 
-  console.log(filteredEvents)
+  console.log(filteredEvents);
+
+  // Render a create link based on the current user's role.
+  const renderCreateLink = () => {
+    if (currentUser.role === 'admin') {
+      return (
+        <button 
+          onClick={() => navigate('/create-event')}
+          style={styles.logout}
+        >
+          Create Event
+        </button>
+      );
+    } else if (currentUser.role === 'super_admin') {
+      return (
+        <button 
+          onClick={() => navigate('/create-rso')}
+          style={styles.logout}
+        >
+          Create RSO
+        </button>
+      );
+    }
+    return null;
+  };
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -113,8 +125,9 @@ function Home() {
     } else {
       console.error("Error logging out:", error);
     }
-  }
+  };
 
+  // Comment and rating functions.
   const handleCommentInputChange = (eventId, value) => {
     setCommentInput({
       ...commentInput,
@@ -126,26 +139,22 @@ function Home() {
     if (!commentInput[eventId] || !commentInput[eventId].trim()) {
       return; 
     }
-
-    // create new comment object 
     const newComment = {
       event_id: eventId, 
       user_id: currentUser.id, 
       comment_text: commentInput[eventId]
     };
 
-    // insert new comment into db 
     const { data: commentData, error: commentError } = await supabase
       .from('comments')
       .insert(newComment); 
 
-    if (error) {
-      console.error("Error submitting comment:", error);
+    if (commentError) {
+      console.error("Error submitting comment:", commentError);
     } else {
-      refetchEvents();        // updates comments 
-      setCommentInput({ ...commentInput, [eventId]: '' });   // new comment 
+      refetchEvents(); // updates comments 
+      setCommentInput({ ...commentInput, [eventId]: '' });
     }
-    
   };
 
   const deleteComment = async (eventId, commentId) => {
@@ -155,7 +164,7 @@ function Home() {
       .eq('comment_id', commentId); 
 
     if (error) {
-      console.error("Error trying to delete the comment:", error); 
+      console.error("Error deleting comment:", error); 
     } else {
       refetchEvents();
     }
@@ -173,7 +182,6 @@ function Home() {
     if (!editingComment) {
       return;
     }
-    // Update the comment text in the database using the comment id.
     const { data, error } = await supabase
       .from('comments')
       .update({ comment_text: editingComment.text })
@@ -214,7 +222,6 @@ function Home() {
     const confirmLeave = window.confirm(`Are you sure you want to leave ${rsoToLeave}?`);
     if (!confirmLeave) return;
   
-    // fetch the RSO id of the rso to leave
     const { data: rsoData, error: rsoError } = await supabase
       .from("rsos")
       .select("rso_id")
@@ -227,7 +234,6 @@ function Home() {
       return;
     }
   
-    // delete the user from the members of the rso
     const { data: rsoMemberData, error: rsoMemberError } = await supabase
       .from("rso_members")
       .delete()
@@ -257,10 +263,10 @@ function Home() {
     }
   };
 
-  // Exclude RSOs that the user is already in from available RSOs
+  // Exclude RSOs that the user is already in from available RSOs.
   const filteredAvailableRSOs = availableRSOs.filter(rso => !userRSOs.includes(rso.name));
 
-  // css junk
+  // CSS styles (inline for simplicity in this example).
   const styles = {
     dashboard: {
       maxWidth: '1200px',
@@ -512,6 +518,10 @@ function Home() {
           <div>
             <div style={styles.userName}>{currentUser.name}</div>
             <div>{currentUser.university}</div>
+            {/* Role-based creation link */}
+            <div style={{ marginTop: '5px' }}>
+              {renderCreateLink()}
+            </div>
             <button 
               style={styles.logout}
               onClick={handleLogout}
@@ -628,20 +638,19 @@ function Home() {
                   </div>
                   <div>
                     {event.visibility === 'public' && (
-                      <span style={{...styles.badge, ...styles.publicBadge}}>Public</span>
+                      <span style={{ ...styles.badge, ...styles.publicBadge }}>Public</span>
                     )}
                     {event.visibility === 'private' && (
-                      <span style={{...styles.badge, ...styles.privateBadge}}>Private</span>
+                      <span style={{ ...styles.badge, ...styles.privateBadge }}>Private</span>
                     )}
                     {event.visibility === 'rso' && (
-                      <span style={{...styles.badge, ...styles.rsoBadge}}>
+                      <span style={{ ...styles.badge, ...styles.rsoBadge }}>
                         {
-                          // Find the RSO name corresponding to event.rso
                           availableRSOs.find(r => r.rso_id === event.rso)?.name || 'Unknown'
                         }
                       </span>
                     )}
-                    <span style={{...styles.badge, backgroundColor: '#f3e5f5', color: '#7b1fa2'}}>
+                    <span style={{ ...styles.badge, backgroundColor: '#f3e5f5', color: '#7b1fa2' }}>
                       {event.type}
                     </span>
                   </div>
@@ -701,16 +710,16 @@ function Home() {
                                 style={styles.commentInput}
                                 rows="2"
                               />
-                              <div style={{marginTop: '5px'}}>
+                              <div style={{ marginTop: '5px' }}>
                                 <button 
                                   onClick={saveEditedComment}
-                                  style={{...styles.commentButton, marginRight: '5px'}}
+                                  style={{ ...styles.commentButton, marginRight: '5px' }}
                                 >
                                   Save
                                 </button>
                                 <button 
                                   onClick={() => setEditingComment(null)}
-                                  style={{...styles.commentButton, backgroundColor: '#f44336'}}
+                                  style={{ ...styles.commentButton, backgroundColor: '#f44336' }}
                                 >
                                   Cancel
                                 </button>
@@ -741,13 +750,13 @@ function Home() {
                   
                   <div style={styles.socialShare}>
                     <button 
-                      style={{...styles.socialButton, ...styles.facebookButton}}
+                      style={{ ...styles.socialButton, ...styles.facebookButton }}
                       onClick={() => shareToSocial('Facebook', event.id)}
                     >
                       Share to Facebook
                     </button>
                     <button 
-                      style={{...styles.socialButton, ...styles.twitterButton}}
+                      style={{ ...styles.socialButton, ...styles.twitterButton }}
                       onClick={() => shareToSocial('Twitter', event.id)}
                     >
                       Share to Twitter

@@ -1,5 +1,5 @@
 .dropdown-list {
-    max-height: 150px; /* Adjust height as needed */
+    max-height: 150px; 
     overflow-y: auto;
     border: 1px solid #ccc;
     background: white;

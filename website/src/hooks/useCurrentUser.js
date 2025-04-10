@@ -16,7 +16,7 @@ export default function useCurrentUser() {
           navigate('/login');
           return;
         }
-
+        
         const { data: userData, error: userError } = await supabase
           .from('users')
           .select('*')

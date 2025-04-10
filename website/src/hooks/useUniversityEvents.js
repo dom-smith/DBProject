@@ -102,7 +102,6 @@ const useUniversityEvents = (universityName, currentUserId) => {
         categoryMap[cat.category_id] = cat.category_name;
       });
 
-      // Fetch RSOs data if needed for display.
       const rsoIds = Array.from(new Set(eventsData.map(e => e.rso_id).filter(id => id != null)));
       const { data: rsoData, error: rsoError } = await supabase
         .from('rsos')
@@ -113,14 +112,11 @@ const useUniversityEvents = (universityName, currentUserId) => {
       rsoData.forEach(rso => {
         rsoMap[rso.rso_id] = rso.name;
       });
-
-      // (Optional) If you still want to filter events based on the creator's university:
       const filteredEvents = eventsData.filter(e => {
         return e.creator && e.creator.university_id === universityId;
       });
 
       const formattedEvents = filteredEvents.map(e => {
-        // Calculate average rating.
         let avgRating = 0;
         if (e.comments && e.comments.length > 0) {
           const ratings = e.comments.map(c => c.rating).filter(r => r != null);
@@ -128,7 +124,6 @@ const useUniversityEvents = (universityName, currentUserId) => {
             avgRating = ratings.reduce((acc, cur) => acc + cur, 0) / ratings.length;
           }
         }
-        // Format comments.
         const formattedComments = e.comments
           ? e.comments.map(c => ({
               id: c.comment_id,

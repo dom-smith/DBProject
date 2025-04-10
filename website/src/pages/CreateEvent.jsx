@@ -91,15 +91,12 @@ const CreateEvent = () => {
       setFormError("Please fill in all fields.");
       return;
     }
-
-    // Combine the date and time into a single datetime value
     const eventDateTime = new Date(`${eventDate}T${eventTime}`);
     if (isNaN(eventDateTime)) {
       setFormError("Invalid date or time.");
       return;
     }
 
-    // Get the current session to retrieve the user ID.
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !session) {
       setFormError("User session error. Please log in.");
@@ -107,7 +104,6 @@ const CreateEvent = () => {
     }
     const userId = session.user.id;
 
-    // Fetch the rso_id for the selected RSO name.
     const { data: rsoData, error: rsoError } = await supabase
       .from("rsos")
       .select("rso_id")
@@ -119,20 +115,19 @@ const CreateEvent = () => {
       return;
     }
 
-    // Insert a new event including combined datetime, selected category, and location.
     const { data, error } = await supabase
       .from("events")
       .insert([
         {
           name: eventName,
           description,
-          event_datetime: eventDateTime, // Combined date and time
+          date: eventDateTime, 
           contact_phone: contactPhone,
           contact_email: contactEmail,
           created_by: userId,
           rso_id: rsoData.rso_id,
-          category_id: eventCategory, // Selected event category ID
-          location_id: selectedLocation, // Selected location ID
+          category_id: eventCategory,
+          location_id: selectedLocation, 
           visibility: 'rso',
           is_approved: true 
         }
